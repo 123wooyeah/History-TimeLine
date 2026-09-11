@@ -316,8 +316,8 @@ export class TimelineChart {
               ? formatYear(person.death, person.deathApprox)
               : '至今';
             const lifespan = person.death
-              ? person.death - person.birth
-              : new Date().getFullYear() - person.birth;
+              ? Math.abs(person.death - person.birth)
+              : Math.abs(new Date().getFullYear() - person.birth);
             return `
               <div style="padding:4px 2px;max-width:280px;">
                 <div style="font-weight:700;font-size:15px;color:#e8c490;margin-bottom:6px;">
@@ -744,8 +744,8 @@ export class TimelineChart {
                   y: rectShape.y + rectShape.height / 2,
                   style: {
                     text: person.death
-                      ? `${person.death - person.birth}岁`
-                      : `${new Date().getFullYear() - person.birth}岁`,
+                      ? `${Math.abs(person.death - person.birth)}岁`
+                      : `${Math.abs(new Date().getFullYear() - person.birth)}岁`,
                     fill: '#8b7f6a',
                     fontSize: 11,
                     textAlign: 'left',
