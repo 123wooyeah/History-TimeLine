@@ -1,0 +1,186 @@
+[
+  {
+    "name": "夏",
+    "start": -2070,
+    "end": -1600,
+    "startApprox": true,
+    "endApprox": true,
+    "color": "#8B7355"
+  },
+  {
+    "name": "商",
+    "start": -1600,
+    "end": -1046,
+    "startApprox": true,
+    "endApprox": false,
+    "color": "#A0522D"
+  },
+  {
+    "name": "西周",
+    "start": -1046,
+    "end": -771,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#CD853F"
+  },
+  {
+    "name": "春秋",
+    "start": -770,
+    "end": -476,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#D2691E"
+  },
+  {
+    "name": "战国",
+    "start": -475,
+    "end": -221,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#B8860B"
+  },
+  {
+    "name": "秦",
+    "start": -221,
+    "end": -207,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#2F4F4F"
+  },
+  {
+    "name": "西汉",
+    "start": -202,
+    "end": 8,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#8B0000"
+  },
+  {
+    "name": "新朝",
+    "start": 9,
+    "end": 23,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#556B2F"
+  },
+  {
+    "name": "东汉",
+    "start": 25,
+    "end": 220,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#A52A2A"
+  },
+  {
+    "name": "三国",
+    "start": 220,
+    "end": 280,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#4682B4"
+  },
+  {
+    "name": "西晋",
+    "start": 265,
+    "end": 316,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#6B8E23"
+  },
+  {
+    "name": "东晋",
+    "start": 317,
+    "end": 420,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#2E8B57"
+  },
+  {
+    "name": "南北朝",
+    "start": 420,
+    "end": 589,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#708090"
+  },
+  {
+    "name": "隋",
+    "start": 581,
+    "end": 618,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#483D8B"
+  },
+  {
+    "name": "唐",
+    "start": 618,
+    "end": 907,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#B22222"
+  },
+  {
+    "name": "五代十国",
+    "start": 907,
+    "end": 979,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#696969"
+  },
+  {
+    "name": "北宋",
+    "start": 960,
+    "end": 1127,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#1E90FF"
+  },
+  {
+    "name": "南宋",
+    "start": 1127,
+    "end": 1279,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#4169E1"
+  },
+  {
+    "name": "元",
+    "start": 1271,
+    "end": 1368,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#9370DB"
+  },
+  {
+    "name": "明",
+    "start": 1368,
+    "end": 1644,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#DAA520"
+  },
+  {
+    "name": "清",
+    "start": 1636,
+    "end": 1912,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#8B4513"
+  },
+  {
+    "name": "民国",
+    "start": 1912,
+    "end": 1949,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#3CB371"
+  },
+  {
+    "name": "现代",
+    "start": 1949,
+    "end": 2026,
+    "startApprox": false,
+    "endApprox": false,
+    "color": "#DC143C"
+  }
+]
