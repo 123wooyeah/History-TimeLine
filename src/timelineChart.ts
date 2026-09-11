@@ -215,6 +215,10 @@ export class TimelineChart {
       maxYear = Math.max(maxYear, ...eventEnds) + 50;
     }
 
+    // 保存供 renderItem 使用
+    const minYearRef = minYear;
+    const maxYearRef = maxYear;
+
     // 计算事件标签布局：贪心算法，逐行放置，避免重叠
     // 由于 renderItem 中无法直接共享状态进行布局计算，我们使用一个闭包变量
     // 在每次 setOption 时重置
@@ -312,12 +316,12 @@ export class TimelineChart {
           if (params.seriesName === '人物') {
             const person = this.people[params.dataIndex];
             if (!person) return '';
+            const birthStr = person.birthUnknown ? '生年不详' : formatYear(person.birth, person.birthApprox);
             const deathStr = person.death
-              ? formatYear(person.death, person.deathApprox)
+              ? (person.deathUnknown ? '卒年不详' : formatYear(person.death, person.deathApprox))
               : '至今';
-            const lifespan = person.death
-              ? Math.abs(person.death - person.birth)
-              : Math.abs(new Date().getFullYear() - person.birth);
+            const showLifespan = !person.birthUnknown && !person.deathUnknown && person.death !== null;
+            const lifespan = showLifespan ? Math.abs(person.death! - person.birth) : 0;
             return `
               <div style="padding:4px 2px;max-width:280px;">
                 <div style="font-weight:700;font-size:15px;color:#e8c490;margin-bottom:6px;">
@@ -325,8 +329,8 @@ export class TimelineChart {
                   <span style="font-size:12px;color:#8b7f6a;font-weight:normal;margin-left:6px;">${person.field} · ${person.dynasty}</span>
                 </div>
                 <div style="font-size:13px;color:#c8bfa8;line-height:1.6;">
-                  ${formatYear(person.birth, person.birthApprox)} — ${deathStr}
-                  <span style="color:#6b5f4a;margin-left:6px;">(${lifespan}岁)</span>
+                  ${birthStr} — ${deathStr}
+                  ${showLifespan ? `<span style="color:#6b5f4a;margin-left:6px;">(${lifespan}岁)</span>` : ''}
                 </div>
                 <div style="font-size:12px;color:#8b7f6a;margin-top:6px;line-height:1.5;">
                   ${person.description}
@@ -710,6 +714,12 @@ export class TimelineChart {
             const person = this.people[params.dataIndex];
             const color = this.getPersonColor(person);
 
+            // 计算时间轴范围（用于不详延伸），通过闭包访问 render 作用域的 minYear/maxYear
+            const xMin = minYearRef;
+            const xMax = maxYearRef;
+            const minCoord = api.coord([xMin, categoryIndex]);
+            const maxCoord = api.coord([xMax, categoryIndex]);
+
             const rectShape = {
               x: start[0],
               y: start[1] - height / 2,
@@ -717,42 +727,170 @@ export class TimelineChart {
               height: height,
             };
 
+            const children: any[] = [];
+
+            // 生年不详：从时间轴左端画虚线到去世年
+            if (person.birthUnknown && person.death) {
+              const dashRect = {
+                x: minCoord[0],
+                y: start[1] - height / 2,
+                width: end[0] - minCoord[0],
+                height: height,
+              };
+              children.push({
+                type: 'rect',
+                shape: dashRect,
+                style: {
+                  fill: 'transparent',
+                  stroke: color,
+                  lineWidth: 1.5,
+                  lineDash: [5, 4],
+                  opacity: 0.6,
+                },
+                styleEmphasis: {
+                  stroke: '#ffffff',
+                  lineWidth: 2.5,
+                  opacity: 1,
+                },
+              });
+              // 已知部分（去世端点）用实心短条
+              const solidRect = {
+                x: end[0] - 8,
+                y: start[1] - height / 2,
+                width: 8,
+                height: height,
+              };
+              children.push({
+                type: 'rect',
+                shape: solidRect,
+                style: {
+                  fill: color,
+                  opacity: 0.82,
+                  stroke: color,
+                  lineWidth: 1.5,
+                },
+                styleEmphasis: {
+                  fill: color,
+                  opacity: 1,
+                  stroke: '#ffffff',
+                  lineWidth: 2.5,
+                },
+              });
+            }
+            // 卒年不详：从出生年画虚线到时间轴右端
+            else if (person.deathUnknown && person.birth) {
+              const dashRect = {
+                x: start[0],
+                y: start[1] - height / 2,
+                width: maxCoord[0] - start[0],
+                height: height,
+              };
+              children.push({
+                type: 'rect',
+                shape: dashRect,
+                style: {
+                  fill: 'transparent',
+                  stroke: color,
+                  lineWidth: 1.5,
+                  lineDash: [5, 4],
+                  opacity: 0.6,
+                },
+                styleEmphasis: {
+                  stroke: '#ffffff',
+                  lineWidth: 2.5,
+                  opacity: 1,
+                },
+              });
+              // 已知部分（出生端点）用实心短条
+              const solidRect = {
+                x: start[0],
+                y: start[1] - height / 2,
+                width: 8,
+                height: height,
+              };
+              children.push({
+                type: 'rect',
+                shape: solidRect,
+                style: {
+                  fill: color,
+                  opacity: 0.82,
+                  stroke: color,
+                  lineWidth: 1.5,
+                },
+                styleEmphasis: {
+                  fill: color,
+                  opacity: 1,
+                  stroke: '#ffffff',
+                  lineWidth: 2.5,
+                },
+              });
+            }
+            // 都不详：整条虚线
+            else if (person.birthUnknown && person.deathUnknown) {
+              const dashRect = {
+                x: minCoord[0],
+                y: start[1] - height / 2,
+                width: maxCoord[0] - minCoord[0],
+                height: height,
+              };
+              children.push({
+                type: 'rect',
+                shape: dashRect,
+                style: {
+                  fill: 'transparent',
+                  stroke: color,
+                  lineWidth: 1.5,
+                  lineDash: [5, 4],
+                  opacity: 0.6,
+                },
+                styleEmphasis: {
+                  stroke: '#ffffff',
+                  lineWidth: 2.5,
+                  opacity: 1,
+                },
+              });
+            }
+            // 正常：完整实线条
+            else {
+              children.push({
+                type: 'rect',
+                shape: rectShape,
+                style: {
+                  fill: color,
+                  opacity: 0.82,
+                  stroke: color,
+                  lineWidth: 1.5,
+                  lineDash: [],
+                },
+                styleEmphasis: {
+                  fill: color,
+                  opacity: 1,
+                  stroke: '#ffffff',
+                  lineWidth: 2.5,
+                  shadowBlur: 0,
+                },
+              });
+            }
+
+            // 年龄文字
+            if (!person.birthUnknown && !person.deathUnknown && person.death) {
+              children.push({
+                type: 'text',
+                x: rectShape.x + rectShape.width + 6,
+                y: rectShape.y + rectShape.height / 2,
+                style: {
+                  text: `${Math.abs(person.death - person.birth)}岁`,
+                  fill: '#8b7f6a',
+                  fontSize: 11,
+                  textAlign: 'left',
+                  textVerticalAlign: 'middle',
+                },
+              });
+            }
+
             return {
               type: 'group',
-              children: [
-                {
-                  type: 'rect',
-                  shape: rectShape,
-                  style: {
-                    fill: color,
-                    opacity: 0.82,
-                    stroke: color,
-                    lineWidth: 1.5,
-                    lineDash: [],
-                  },
-                  styleEmphasis: {
-                    fill: color,
-                    opacity: 1,
-                    stroke: '#ffffff',
-                    lineWidth: 2.5,
-                    shadowBlur: 0,
-                  },
-                },
-                {
-                  type: 'text',
-                  x: rectShape.x + rectShape.width + 6,
-                  y: rectShape.y + rectShape.height / 2,
-                  style: {
-                    text: person.death
-                      ? `${Math.abs(person.death - person.birth)}岁`
-                      : `${Math.abs(new Date().getFullYear() - person.birth)}岁`,
-                    fill: '#8b7f6a',
-                    fontSize: 11,
-                    textAlign: 'left',
-                    textVerticalAlign: 'middle',
-                  },
-                },
-              ],
+              children,
             };
           },
           encode: {

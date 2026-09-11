@@ -253,6 +253,66 @@ function parseWikidataYear(timeStr: string): { year: number; approx: boolean } |
   return { year: sign * year, approx: false };
 }
 
+// 从描述文本中提取生卒年（用于 Wikidata 属性数据不准确时的兜底）
+// 支持格式："前332年－前257年"、"c. 332 BC – 257 BC"、"332 BC - 257 BC"、"公元前551年―公元前479年"等
+function extractYearsFromDescription(desc: string): { birth: number | null; death: number | null; approx: boolean } {
+  if (!desc) return { birth: null, death: null, approx: false };
+
+  const result: { birth: number | null; death: number | null; approx: boolean } = {
+    birth: null,
+    death: null,
+    approx: false,
+  };
+
+  const text = desc.toLowerCase();
+  result.approx = text.includes('c.') || text.includes('约') || text.includes('circa') || text.includes('around');
+
+  // 辅助：将字符串年份转为数字（支持中文"前/公元前"和英文"BC"）
+  const toYear = (yearStr: string, isBC: boolean): number => {
+    const y = parseInt(yearStr.replace(/[,\s]/g, ''), 10);
+    if (isNaN(y)) return 0;
+    return isBC ? -y : y;
+  };
+
+  // 模式1：英文格式 "c. 332 BC – 257 BC" 或 "332 BC - 257 BC"
+  const enPattern = /(?:c\.?\s*)?(\d{1,4})\s*bc\s*[-–—]\s*(\d{1,4})\s*bc/i;
+  let m = text.match(enPattern);
+  if (m) {
+    result.birth = toYear(m[1], true);
+    result.death = toYear(m[2], true);
+    return result;
+  }
+
+  // 模式2：英文格式 "1879–1955"（公元后）
+  const enAdPattern = /(\d{3,4})\s*[-–—]\s*(\d{3,4})/;
+  m = text.match(enAdPattern);
+  if (m && !text.includes('bc')) {
+    result.birth = toYear(m[1], false);
+    result.death = toYear(m[2], false);
+    return result;
+  }
+
+  // 模式3：中文格式 "公元前332年－公元前257年" 或 "前332年—前257年"
+  const zhPattern = /(?:公元)?前(\d{1,4})年\s*[-—－]\s*(?:公元)?前(\d{1,4})年/;
+  m = desc.match(zhPattern);
+  if (m) {
+    result.birth = toYear(m[1], true);
+    result.death = toYear(m[2], true);
+    return result;
+  }
+
+  // 模式4：中文格式 "1879年－1955年"（公元后）
+  const zhAdPattern = /(\d{3,4})年\s*[-—－]\s*(\d{3,4})年/;
+  m = desc.match(zhAdPattern);
+  if (m && !desc.includes('前')) {
+    result.birth = toYear(m[1], false);
+    result.death = toYear(m[2], false);
+    return result;
+  }
+
+  return result;
+}
+
 // 根据实体ID获取人物详细信息
 export async function getWikidataPerson(entityId: string): Promise<Person | null> {
   // 先查缓存
@@ -307,13 +367,18 @@ export async function getWikidataPerson(entityId: string): Promise<Person | null
     let deathYear: number | null = null;
     let birthApprox = false;
     let deathApprox = false;
+    let birthUnknown = false;
+    let deathUnknown = false;
 
     if (birthClaim?.time) {
       const parsed = parseWikidataYear(birthClaim.time);
       if (parsed) {
         birthYear = parsed.year;
+        const precision = birthClaim.precision ?? 11;
         // 精度低于年（如世纪、千年）标记为约
-        birthApprox = (birthClaim.precision ?? 11) < 9;
+        birthApprox = precision < 9;
+        // 精度低于百年（世纪级及以下）标记为生年不详
+        birthUnknown = precision < 8;
       } else {
         console.warn('无法解析出生日期:', birthClaim.time, entityId);
       }
@@ -323,13 +388,29 @@ export async function getWikidataPerson(entityId: string): Promise<Person | null
       const parsed = parseWikidataYear(deathClaim.time);
       if (parsed) {
         deathYear = parsed.year;
-        deathApprox = (deathClaim.precision ?? 11) < 9;
+        const precision = deathClaim.precision ?? 11;
+        deathApprox = precision < 9;
+        deathUnknown = precision < 8;
       }
     }
 
     if (birthYear === null) {
       console.warn('无法获取出生年份:', entityId, name);
       return null;
+    }
+
+    // 数据校验：如果出生年晚于去世年（Wikidata 数据质量问题，如出生只有世纪级精度）
+    // 尝试从描述文本中提取更准确的生卒年
+    if (deathYear !== null && birthYear > deathYear) {
+      console.warn(`Wikidata 生卒年异常 (${birthYear} > ${deathYear})，尝试从描述中修正:`, name);
+      const extracted = extractYearsFromDescription(description);
+      if (extracted.birth !== null && extracted.death !== null && extracted.birth < extracted.death) {
+        birthYear = extracted.birth;
+        deathYear = extracted.death;
+        birthApprox = birthApprox || extracted.approx;
+        deathApprox = deathApprox || extracted.approx;
+        console.warn(`已修正为: ${birthYear} ~ ${deathYear}`);
+      }
     }
 
     // 推断领域（从描述中粗略判断）
@@ -344,6 +425,8 @@ export async function getWikidataPerson(entityId: string): Promise<Person | null
       death: deathYear,
       birthApprox,
       deathApprox,
+      birthUnknown,
+      deathUnknown,
       dynasty,
       country: '',
       field,
@@ -536,20 +619,27 @@ export async function getWikidataEvent(entityId: string): Promise<HistoricalEven
     let endYear: number | null = null;
     let startApprox = false;
     let endApprox = false;
+    let startUnknown = false;
+    let endUnknown = false;
 
     if (startClaim?.time) {
       const parsed = parseWikidataYear(startClaim.time);
       if (parsed) {
         startYear = parsed.year;
-        startApprox = (startClaim.precision ?? 11) < 9;
+        const precision = startClaim.precision ?? 11;
+        startApprox = precision < 9;
+        startUnknown = precision < 8;
       }
     } else if (pointClaim?.time) {
       const parsed = parseWikidataYear(pointClaim.time);
       if (parsed) {
         startYear = parsed.year;
         endYear = parsed.year;
-        startApprox = (pointClaim.precision ?? 11) < 9;
-        endApprox = (pointClaim.precision ?? 11) < 9;
+        const precision = pointClaim.precision ?? 11;
+        startApprox = precision < 9;
+        endApprox = precision < 9;
+        startUnknown = precision < 8;
+        endUnknown = precision < 8;
       }
     }
 
@@ -557,13 +647,28 @@ export async function getWikidataEvent(entityId: string): Promise<HistoricalEven
       const parsed = parseWikidataYear(endClaim.time);
       if (parsed) {
         endYear = parsed.year;
-        endApprox = (endClaim.precision ?? 11) < 9;
+        const precision = endClaim.precision ?? 11;
+        endApprox = precision < 9;
+        endUnknown = precision < 8;
       }
     }
 
     if (startYear === null) {
       console.warn('无法获取事件年份:', entityId, name);
       return null;
+    }
+
+    // 数据校验：如果结束年早于开始年，尝试从描述文本中修正
+    if (endYear !== null && startYear > endYear) {
+      console.warn(`Wikidata 事件年份异常 (${startYear} > ${endYear})，尝试从描述中修正:`, name);
+      const extracted = extractYearsFromDescription(description);
+      if (extracted.birth !== null && extracted.death !== null && extracted.birth < extracted.death) {
+        startYear = extracted.birth;
+        endYear = extracted.death;
+        startApprox = startApprox || extracted.approx;
+        endApprox = endApprox || extracted.approx;
+        console.warn(`已修正为: ${startYear} ~ ${endYear}`);
+      }
     }
 
     // 推断事件类别
@@ -588,6 +693,8 @@ export async function getWikidataEvent(entityId: string): Promise<HistoricalEven
       endYear,
       startApprox,
       endApprox,
+      startUnknown,
+      endUnknown,
       category,
       location,
       description: description || '（来自 Wikidata）',

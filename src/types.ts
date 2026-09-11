@@ -6,6 +6,8 @@ export interface Person {
   death: number | null;
   birthApprox: boolean;
   deathApprox: boolean;
+  birthUnknown: boolean; // 生年不详（精度低于百年，如世纪级）
+  deathUnknown: boolean; // 卒年不详（精度低于百年，如世纪级）
   dynasty: string;
   country: string;
   field: string;
@@ -20,6 +22,8 @@ export interface HistoricalEvent {
   endYear: number | null;
   startApprox: boolean;
   endApprox: boolean;
+  startUnknown: boolean; // 始年不详
+  endUnknown: boolean; // 终年不详
   category: string;
   location: string;
   description: string;

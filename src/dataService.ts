@@ -3,9 +3,17 @@ import dynastiesData from './data/dynasties.json';
 import eventsData from './data/events.json';
 import type { Person, Dynasty, HistoricalEvent } from './types';
 
-const allPeople: Person[] = peopleData as Person[];
+const allPeople: Person[] = (peopleData as any[]).map((p) => ({
+  birthUnknown: false,
+  deathUnknown: false,
+  ...p,
+})) as Person[];
 const allDynasties: Dynasty[] = dynastiesData as Dynasty[];
-const allEvents: HistoricalEvent[] = eventsData as HistoricalEvent[];
+const allEvents: HistoricalEvent[] = (eventsData as any[]).map((e) => ({
+  startUnknown: false,
+  endUnknown: false,
+  ...e,
+})) as HistoricalEvent[];
 
 export function getAllPeople(): Person[] {
   return allPeople;
