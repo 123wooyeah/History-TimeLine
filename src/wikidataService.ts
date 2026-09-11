@@ -1,7 +1,8 @@
-import type { Person } from './types';
+import type { Person, HistoricalEvent } from './types';
 
 const WIKIDATA_API = 'https://www.wikidata.org/w/api.php';
 const CACHE_KEY = 'wikidata_people_cache_v1';
+const EVENT_CACHE_KEY = 'wikidata_events_cache_v1';
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7天
 
 let jsonpCounter = 0;
@@ -411,4 +412,206 @@ function inferDynasty(_description: string, birthYear: number | null): string {
   if (birthYear < 1912) return '清';
   if (birthYear < 1949) return '民国';
   return '现代';
+}
+
+// ============ 事件相关功能 ============
+
+function getEventCache(): Record<string, { event: HistoricalEvent; timestamp: number }> {
+  try {
+    const raw = localStorage.getItem(EVENT_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function setEventCache(id: string, event: HistoricalEvent) {
+  try {
+    const cache = getEventCache();
+    cache[id] = { event, timestamp: Date.now() };
+    localStorage.setItem(EVENT_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // ignore
+  }
+}
+
+function getCachedEvent(id: string): HistoricalEvent | null {
+  const cache = getEventCache();
+  const entry = cache[id];
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+    return entry.event;
+  }
+  return null;
+}
+
+// 搜索事件（返回 Wikidata 实体列表）
+export async function searchWikidataEvents(keyword: string): Promise<Array<{ id: string; label: string; description: string }>> {
+  if (!keyword.trim()) return [];
+
+  try {
+    const url = `${WIKIDATA_API}?action=wbsearchentities&search=${encodeURIComponent(keyword)}&language=zh&format=json&limit=20&type=item`;
+    const data: any = await jsonp(url, 8000);
+    if (!data || !data.search) return [];
+
+    // 过滤非事件结果
+    const eventKeywords = ['战争', '战役', '革命', '起义', '运动', '事件', '会议', '条约', '协定',
+      '宣言', '公告', '法案', '改革', '政变', '暴动', '叛乱', '入侵', '征服',
+      '建国', '灭亡', '统一', '分裂', '登基', '退位', '迁都', '变法',
+      'war', 'battle', 'revolution', 'uprising', 'movement', 'event', 'conference',
+      'treaty', 'agreement', 'declaration', 'act', 'reform', 'coup', 'invasion',
+      'conquest', 'founding', 'establishment', 'dissolution', 'unification',
+      '战争', '起义', '革命', '变法', '运动', '事变', '大战', '会战', '大捷',
+      '之乱', '之变', '之役', '之治', '盛世', '新政', '维新'];
+
+    const results = data.search.filter((item: any) => {
+      const desc = (item.description || '').toLowerCase();
+
+      // 描述中含事件关键词的保留
+      for (const kw of eventKeywords) {
+        if (desc.includes(kw.toLowerCase())) return true;
+      }
+
+      // 标签中含事件相关词的保留
+      const labelEventPatterns = [
+        /战争|战役|革命|起义|运动|事件|会议|条约|宣言|改革|政变|之乱|之变|之役|之治|新政|维新|大捷|大战|会战/,
+        /war|battle|revolution|uprising|movement|treaty|conference|reform|coup/i,
+      ];
+      for (const pattern of labelEventPatterns) {
+        if (pattern.test(item.label || '')) return true;
+      }
+
+      // 排除明显是人物的结果
+      if (isPersonDescription(desc)) return false;
+
+      return false;
+    });
+
+    return results.slice(0, 5).map((item: any) => ({
+      id: item.id,
+      label: item.label || '',
+      description: item.description || '',
+    }));
+  } catch (e) {
+    console.warn('Wikidata 事件搜索失败:', e);
+    return [];
+  }
+}
+
+// 根据实体ID获取事件详细信息
+export async function getWikidataEvent(entityId: string): Promise<HistoricalEvent | null> {
+  // 先查缓存
+  const cached = getCachedEvent(`wd:${entityId}`);
+  if (cached) return cached;
+
+  try {
+    const url = `${WIKIDATA_API}?action=wbgetentities&ids=${encodeURIComponent(entityId)}&format=json&props=labels|descriptions|claims&languages=zh|en`;
+    const data: any = await jsonp(url, 15000);
+
+    if (data?.error) {
+      console.warn('Wikidata API 错误:', data.error);
+      return null;
+    }
+
+    const entity = data?.entities?.[entityId];
+    if (!entity || entity.missing !== undefined) {
+      console.warn('Wikidata 实体不存在:', entityId);
+      return null;
+    }
+
+    const labels = entity.labels || {};
+    const descriptions = entity.descriptions || {};
+    const claims = entity.claims || {};
+
+    const name = labels.zh?.value || labels.en?.value || entityId;
+    const description = descriptions.zh?.value || descriptions.en?.value || '';
+
+    // 提取开始时间 P580 和结束时间 P582
+    const startClaim = getFirstValidTimeClaim(claims.P580);
+    const endClaim = getFirstValidTimeClaim(claims.P582);
+
+    // 如果没有开始时间，试试点时间 P585
+    const pointClaim = getFirstValidTimeClaim(claims.P585);
+
+    let startYear: number | null = null;
+    let endYear: number | null = null;
+    let startApprox = false;
+    let endApprox = false;
+
+    if (startClaim?.time) {
+      const parsed = parseWikidataYear(startClaim.time);
+      if (parsed) {
+        startYear = parsed.year;
+        startApprox = (startClaim.precision ?? 11) < 9;
+      }
+    } else if (pointClaim?.time) {
+      const parsed = parseWikidataYear(pointClaim.time);
+      if (parsed) {
+        startYear = parsed.year;
+        endYear = parsed.year;
+        startApprox = (pointClaim.precision ?? 11) < 9;
+        endApprox = (pointClaim.precision ?? 11) < 9;
+      }
+    }
+
+    if (endClaim?.time) {
+      const parsed = parseWikidataYear(endClaim.time);
+      if (parsed) {
+        endYear = parsed.year;
+        endApprox = (endClaim.precision ?? 11) < 9;
+      }
+    }
+
+    if (startYear === null) {
+      console.warn('无法获取事件年份:', entityId, name);
+      return null;
+    }
+
+    // 推断事件类别
+    const category = inferEventCategory(description, name);
+
+    // 提取地点（P276 位置 或 P17 国家）
+    let location = '';
+    const locationClaim = claims.P276?.[0]?.mainsnak?.datavalue?.value;
+    const countryClaim = claims.P17?.[0]?.mainsnak?.datavalue?.value;
+    if (locationClaim?.id) {
+      // 简单处理，后续可优化为获取地点名称
+      location = '';
+    } else if (countryClaim?.id) {
+      location = '';
+    }
+
+    const event: HistoricalEvent = {
+      id: `wd:${entityId}`,
+      name,
+      aliases: [],
+      startYear,
+      endYear,
+      startApprox,
+      endApprox,
+      category,
+      location,
+      description: description || '（来自 Wikidata）',
+    };
+
+    // 写入缓存
+    setEventCache(`wd:${entityId}`, event);
+    return event;
+  } catch (e: any) {
+    console.warn('获取 Wikidata 事件失败:', entityId, e?.message || e);
+    return null;
+  }
+}
+
+function inferEventCategory(description: string, name: string): string {
+  const desc = description.toLowerCase();
+  const n = name.toLowerCase();
+  if (desc.includes('战争') || desc.includes('战役') || n.includes('战') || desc.includes('war') || desc.includes('battle')) return '战争';
+  if (desc.includes('革命') || desc.includes('起义') || desc.includes('revolution') || desc.includes('uprising')) return '革命';
+  if (desc.includes('政治') || desc.includes('政变') || desc.includes('登基') || desc.includes('建国') || desc.includes('建立') || desc.includes('political') || desc.includes('coup')) return '政治';
+  if (desc.includes('文化') || desc.includes('艺术') || desc.includes('运动') || desc.includes('culture') || desc.includes('renaissance')) return '文化';
+  if (desc.includes('科学') || desc.includes('技术') || desc.includes('发明') || desc.includes('science') || desc.includes('technology')) return '科技';
+  if (desc.includes('外交') || desc.includes('条约') || desc.includes('出使') || desc.includes('diplomacy') || desc.includes('treaty')) return '外交';
+  if (desc.includes('经济') || desc.includes('改革') || desc.includes('economy') || desc.includes('reform')) return '经济';
+  if (desc.includes('社会') || desc.includes('运动') || desc.includes('society')) return '社会';
+  return '其他';
 }
