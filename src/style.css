@@ -509,21 +509,198 @@ body {
 /* Responsive */
 @media (max-width: 768px) {
   #app {
-    padding: 1rem 0.75rem;
+    padding: 0.75rem 0.6rem;
+    max-width: 100%;
+  }
+  .app-header {
+    margin-bottom: 1rem;
   }
   .app-title {
-    font-size: 1.6rem;
+    font-size: 1.35rem;
+    letter-spacing: 0.06em;
+  }
+  .app-subtitle {
+    font-size: 0.8rem;
   }
   .search-section,
   .chart-section,
   .recommend-section {
-    padding: 1rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+  .search-section {
+    padding: 0.75rem;
+  }
+  .search-tabs {
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+  }
+  .search-tab {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8rem;
+  }
+  .search-input {
+    font-size: 16px; /* 防止 iOS 自动缩放 */
+    padding: 0.5rem 0.75rem;
+  }
+  .suggestion-item {
+    padding: 0.5rem 0.6rem;
+    min-height: 48px; /* 触摸友好 */
+  }
+  .sugg-name {
+    font-size: 0.9rem;
+  }
+  .sugg-sub {
+    font-size: 0.75rem;
   }
   .chart-container {
-    min-height: 400px;
+    min-height: 360px;
+  }
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
   }
   .controls-row {
     flex-direction: column;
     align-items: flex-start;
+    width: 100%;
+    gap: 0.5rem;
   }
+  .sort-select,
+  .view-select {
+    font-size: 0.82rem;
+    padding: 0.3rem 0.5rem;
+  }
+  .action-buttons {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .action-btn {
+    padding: 0.45rem 0.8rem;
+    font-size: 0.8rem;
+    min-height: 36px;
+  }
+  .tags-container {
+    gap: 0.35rem;
+    min-height: 32px;
+  }
+  .person-tag,
+  .event-tag {
+    padding: 0.2rem 0.35rem 0.2rem 0.5rem;
+    font-size: 0.78rem;
+    min-height: 28px;
+  }
+  .tag-remove {
+    width: 20px;
+    height: 20px;
+    font-size: 0.85rem;
+  }
+  .count-info {
+    font-size: 0.78rem;
+  }
+  .count-info span {
+    font-size: 0.9rem;
+  }
+  .recommend-title {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  .recommend-buttons {
+    gap: 0.35rem;
+  }
+  .recommend-btn {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
+    min-height: 36px;
+  }
+  .legend-section {
+    font-size: 0.72rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .app-footer {
+    font-size: 0.72rem;
+    padding: 1rem 0 0.3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  #app {
+    padding: 0.5rem 0.4rem;
+  }
+  .app-title {
+    font-size: 1.15rem;
+  }
+  .app-subtitle {
+    font-size: 0.72rem;
+  }
+  .chart-container {
+    min-height: 320px;
+  }
+  .search-input {
+    font-size: 15px;
+  }
+  .recommend-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .recommend-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* Touch / 移动端交互优化 */
+@media (hover: none) and (pointer: coarse) {
+  /* 移除 hover 效果，改用 active */
+  .action-btn:hover,
+  .recommend-btn:hover,
+  .search-tab:hover,
+  .person-tag:hover,
+  .event-tag:hover {
+    transform: none;
+    box-shadow: none;
+    background: var(--accent-bg);
+    color: var(--accent-light);
+    border-color: rgba(212, 165, 106, 0.3);
+  }
+  .action-btn:active,
+  .recommend-btn:active,
+  .search-tab:active {
+    background: var(--accent);
+    color: #1a1612;
+    transform: scale(0.97);
+  }
+  .tag-remove:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--muted);
+  }
+  .tag-remove:active {
+    background: rgba(231, 76, 60, 0.3);
+    color: #e74c3c;
+  }
+  /* 增大触摸区域 */
+  .action-btn,
+  .recommend-btn,
+  .search-tab,
+  .tag-remove {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  /* 禁用双击缩放导致的延迟 */
+  .suggestion-item {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(212, 165, 106, 0.1);
+  }
+}
+
+/* 防止 iOS 上的橡皮筋效果影响图表滚动 */
+.chart-section {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }

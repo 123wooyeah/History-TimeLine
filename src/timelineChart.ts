@@ -10,6 +10,11 @@ export class TimelineChart {
   private dynasties: Dynasty[] = [];
   private sortMode: SortMode = 'default';
 
+  private isMobile(): boolean {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+
   constructor(container: HTMLElement) {
     this.chart = echarts.init(container, null, { renderer: 'svg' });
     this.dynasties = getAllDynasties();
@@ -397,10 +402,10 @@ export class TimelineChart {
         },
       },
       grid: {
-        left: 100,
-        right: 40,
+        left: this.isMobile() ? 64 : 100,
+        right: this.isMobile() ? 20 : 40,
         top: gridTop,
-        bottom: 50,
+        bottom: this.isMobile() ? 58 : 50,
         containLabel: false,
       },
       axisPointer: {
@@ -425,7 +430,7 @@ export class TimelineChart {
         axisTick: { lineStyle: { color: '#3d3428' } },
         axisLabel: {
           color: '#8b7f6a',
-          fontSize: 12,
+          fontSize: this.isMobile() ? 11 : 12,
           formatter: (value: number) => {
             if (value < 0) return `前${Math.abs(value)}`;
             return `${value}`;
@@ -444,7 +449,7 @@ export class TimelineChart {
         axisTick: { show: false },
         axisLabel: {
           color: '#e8dfd0',
-          fontSize: 13,
+          fontSize: this.isMobile() ? 11 : 13,
           fontWeight: 500,
           fontFamily: '"Noto Serif SC", "Songti SC", serif',
         },
@@ -460,16 +465,19 @@ export class TimelineChart {
           filterMode: 'none',
           zoomOnMouseWheel: true,
           moveOnMouseMove: true,
+          moveOnMouseWheel: false,
+          preventDefaultMouseMove: true,
+          zoomLock: false,
         },
         {
           type: 'slider',
           xAxisIndex: 0,
           bottom: 10,
-          height: 20,
+          height: this.isMobile() ? 28 : 20,
           borderColor: '#3d3428',
           fillerColor: 'rgba(212, 165, 106, 0.15)',
           handleStyle: { color: '#d4a56a' },
-          textStyle: { color: '#8b7f6a', fontSize: 11 },
+          textStyle: { color: '#8b7f6a', fontSize: this.isMobile() ? 12 : 11 },
           backgroundColor: '#262019',
           dataBackground: {
             lineStyle: { color: '#3d3428' },
